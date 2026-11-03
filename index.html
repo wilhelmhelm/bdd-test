@@ -142,7 +142,7 @@ table{border-collapse:collapse;width:100%}
     <input type="text" id="set-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
     <label for="set-key">Ключ</label>
     <input type="text" id="set-key" placeholder="тот же ключ, что в скрипте" autocomplete="off">
-    <p class="hint">Если поля пустые, используются адрес и ключ, заданные в самом файле страницы.</p>
+    <p class="hint">Адрес и ключ задаются в самом файле страницы (переменные REG_URL и REG_KEY) и здесь только показываются.</p>
     <h3>Перенос настроек на другой компьютер</h3>
     <textarea id="set-json" rows="3" placeholder="Нажмите «Показать настройки», скопируйте текст. На другом компьютере вставьте его сюда и нажмите «Загрузить»"></textarea>
     <div class="acts" style="margin-top:8px">
@@ -231,8 +231,7 @@ function applyCfg(o){
   if(!o||typeof o!=='object')return;
   if(Array.isArray(o.columns)){var seen={};CFG.columns=o.columns.map(clean).filter(function(c){if(!c||seen[c])return false;seen[c]=1;return true})}
   if(Array.isArray(o.members)){for(var i=0;i<5;i++){var m=o.members[i]||{};CFG.members[i]={n:clean(m.n),p:clean(m.p)}}}
-  if(typeof o.url==='string'&&o.url.trim())CFG.url=o.url.trim();
-  if(typeof o.key==='string'&&o.key.trim())CFG.key=o.key.trim();
+  CFG.url=REG_URL;CFG.key=REG_KEY; /* адрес и ключ всегда берутся из файла, сохранённые в браузере игнорируются */
   if(typeof o.lastCol==='string')CFG.lastCol=o.lastCol;
 }
 function loadCfg(){try{var r=localStorage.getItem(LS);if(r)applyCfg(JSON.parse(r))}catch(e){}}
@@ -262,7 +261,7 @@ function fillSettings(){
     var b=document.createElement('input');b.type='text';b.id='m-p'+i;b.placeholder='Должность';b.value=CFG.members[i].p;
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
   }
-  $('set-url').value=CFG.url;$('set-key').value=CFG.key;
+  $('set-url').value=CFG.url;$('set-key').value=CFG.key;$('set-url').readOnly=true;$('set-key').readOnly=true;
   $('e-set').textContent='';$('m-set').textContent='';
 }
 function readSettingsForm(){
