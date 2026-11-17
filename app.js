@@ -1,4 +1,6 @@
 var REG_URL = 'https://script.google.com/macros/s/AKfycbxCXToB7eu_yq8T6v0mwWOtoNV5dBe4cXr7WaQq-TO9ACaPNcowYtIAVcJkW_GOiA5Myg/exec';
+/* true — состав комиссий задаётся ТОЛЬКО в файле comissions.js: на странице его нельзя изменить, кнопки «Настройки» и «Изменить состав» скрыты, сохранённое в браузерах игнорируется. false — вернуть ручное редактирование. */
+var COMM_LOCKED = true;
 var REG_KEY = 'I01a1kfzUSBSUKdVgdLgx';
 var LOGO = 'img/logo.png';
 
@@ -60,8 +62,9 @@ var PRE=(window.PRESET&&Array.isArray(window.PRESET.columns)&&Array.isArray(wind
 /* Составы комиссий из файла comissions.js (главнее config.js): ключ "общий" или номер колонны (33) либо её полное название */
 (function(){
   var C=window.COMISSIONS;if(!C||typeof C!=='object')return;
-  var gen=[],pc={};
+  var gen=[],pc={},bad=false;
   function lst(a){var r=[];(Array.isArray(a)?a:[]).forEach(function(x){
+    if(x==null){bad=true;return} /* пустая запись: обычно пропущена запятая между людьми */
     var n,p;if(Array.isArray(x)){n=x[0];p=x[1]}else if(x&&typeof x==='object'){n=x.n;p=x.p}else{n=x;p=''}
     n=clean(n);if(!n)return;if(r.length>=5){console.warn('comissions.js: в составе больше 5 человек, лишние не учтены: '+n);return}
     r.push({n:n,p:clean(p)})});return cp5(r)}
@@ -75,6 +78,7 @@ var PRE=(window.PRESET&&Array.isArray(window.PRESET.columns)&&Array.isArray(wind
     var col=colOf(k);
     if(!col){console.warn('comissions.js: не найдена колонна «'+k+'», запись пропущена');return}
     var r=lst(C[k]);if(hasAny(r))pc[col]=r});
+  window.COMM_BAD=bad;
   if(!hasAny(gen)&&!Object.keys(pc).length)return; /* пустой шаблон файла не отменяет config.js */
   PRE={columns:COLS.slice(),members:cp5(gen),comm:pc};
 })();
@@ -120,8 +124,8 @@ function remoteDone(ok,wrong,n){
 function applyCfg(o){
   if(!o||typeof o!=='object')return;
   CFG.columns=COLS.slice(); /* список колонн всегда берётся из кода */
-  if(Array.isArray(o.members)){for(var i=0;i<5;i++){var m=o.members[i]||{};CFG.members[i]={n:clean(m.n),p:clean(m.p)}}}
-  if(o.comm&&typeof o.comm==='object'){CFG.comm={};COLS.forEach(function(c){if(Array.isArray(o.comm[c])){var r=cp5(o.comm[c]);if(hasAny(r))CFG.comm[c]=r}})}
+  if(!COMM_LOCKED&&Array.isArray(o.members)){for(var i=0;i<5;i++){var m=o.members[i]||{};CFG.members[i]={n:clean(m.n),p:clean(m.p)}}}
+  if(!COMM_LOCKED&&o.comm&&typeof o.comm==='object'){CFG.comm={};COLS.forEach(function(c){if(Array.isArray(o.comm[c])){var r=cp5(o.comm[c]);if(hasAny(r))CFG.comm[c]=r}})}
   CFG.url=REG_URL;CFG.key=REG_KEY; /* адрес и ключ всегда берутся из файла, сохранённые в браузере игнорируются */
   if(typeof o.lastCol==='string')CFG.lastCol=o.lastCol;
 }
@@ -139,12 +143,15 @@ function members(unit){return commList(unit).map(function(m,i){return {i:i,n:m.n
 function renderComm(){
   var unit=$('unit').value,box=$('comm');box.innerHTML='';
   var own=hasAny(CFG.comm[unit]),ms=members(unit);
-  if(!ms.length){box.appendChild(el('div','hint','Состав комиссии не задан. Нажмите «Изменить состав» ниже или откройте «Настройки».'))}
+  if(COMM_LOCKED&&window.COMM_BAD)box.appendChild(el('div','err','В файле comissions.js есть ошибка в записи состава (возможно, пропущена запятая между людьми). Проверьте состав и сообщите администратору.'));
+  if(!ms.length){box.appendChild(el('div',COMM_LOCKED&&!window.COMISSIONS?'err':'hint',
+    COMM_LOCKED?(window.COMISSIONS?'Состав комиссии для этой колонны не задан в файле comissions.js. Обратитесь к администратору.':'Не удалось прочитать файл comissions.js: он отсутствует или содержит ошибку (проверьте запятые и кавычки). Обратитесь к администратору.')
+    :'Состав комиссии не задан. Нажмите «Изменить состав» ниже или откройте «Настройки».'))}
   ms.forEach(function(m){
     var lab=el('label','chk');var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.value=m.i;
     lab.appendChild(cb);lab.appendChild(el('span',null,m.n+(m.p?' — '+m.p:'')));box.appendChild(lab);
   });
-  $('comm-src').textContent=!ms.length?'':own?'Состав сохранён для этой колонны.':unit?'Для этой колонны свой состав не задан, подставлен общий.':'Показан общий состав.';
+  $('comm-src').textContent=!ms.length?'':own?(COMM_LOCKED?'Состав для этой колонны задан в файле comissions.js.':'Состав сохранён для этой колонны.'):unit?'Для этой колонны свой состав не задан, подставлен общий.':'Показан общий состав.';
 }
 function refreshStart(){
   var sel=$('unit');sel.innerHTML='';
@@ -242,6 +249,11 @@ $('b-imp').onclick=function(){
   loadCfg();
   if(PRE){CFG.columns=PRE.columns.slice();if(hasAny(PRE.members)){CFG.members=[];for(var pi=0;pi<5;pi++){var pm=PRE.members[pi]||{};CFG.members.push({n:clean(pm.n),p:clean(pm.p)})}}}
   if(PRE&&PRE.comm&&typeof PRE.comm==='object'){COLS.forEach(function(c){if(Array.isArray(PRE.comm[c])){var r=cp5(PRE.comm[c]);if(hasAny(r))CFG.comm[c]=r}})} /* состав из config.js главнее сохранённого в браузере */
+  if(COMM_LOCKED){ /* составы только из comissions.js (или config.js), всё, что сохранено в браузере, игнорируется */
+    document.body.classList.add('lock');
+    CFG.members=PRE?cp5(PRE.members):blank5();CFG.comm={};
+    if(PRE&&PRE.comm)COLS.forEach(function(c){if(hasAny(PRE.comm[c]))CFG.comm[c]=cp5(PRE.comm[c])});
+  }
   CFG.columns=COLS.slice();
   if(REMOTE)applyRemote();
   refreshStart();
