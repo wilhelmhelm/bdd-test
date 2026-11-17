@@ -56,7 +56,28 @@ function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim()}
 function b64e(t){return btoa(encodeURIComponent(t).replace(/%([0-9A-F]{2})/g,function(m,h){return String.fromCharCode(parseInt(h,16))})).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function b64d(x){x=x.replace(/-/g,'+').replace(/_/g,'/');while(x.length%4)x+='=';return decodeURIComponent(atob(x).split('').map(function(c){return '%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)}).join(''))}
 /* ---------- удалённый режим: #t=... в ссылке ---------- */
-var PRE=(window.PRESET&&Array.isArray(window.PRESET.columns)&&Array.isArray(window.PRESET.members))?window.PRESET:null;
+var PRE=(window.PRESET&&Array.isArray(window.PRESET.columns)&&Array.isArray(window.PRESET.members))?window.PRESET:null; /* старый способ: config.js */
+/* Составы комиссий из файла comissions.js (главнее config.js): ключ "общий" или номер колонны (33) либо её полное название */
+(function(){
+  var C=window.COMISSIONS;if(!C||typeof C!=='object')return;
+  var gen=[],pc={};
+  function lst(a){var r=[];(Array.isArray(a)?a:[]).forEach(function(x){
+    var n,p;if(Array.isArray(x)){n=x[0];p=x[1]}else if(x&&typeof x==='object'){n=x.n;p=x.p}else{n=x;p=''}
+    n=clean(n);if(!n)return;if(r.length>=5){console.warn('comissions.js: в составе больше 5 человек, лишние не учтены: '+n);return}
+    r.push({n:n,p:clean(p)})});return cp5(r)}
+  function colOf(k){
+    if(COLS.indexOf(k)>=0)return k;
+    if(/^\d+$/.test(String(k).trim())){var re=new RegExp('№\\s*'+String(k).trim()+'$');for(var i=0;i<COLS.length;i++)if(re.test(COLS[i]))return COLS[i]}
+    return null}
+  Object.keys(C).forEach(function(k){
+    var kk=String(k).trim().toLowerCase();
+    if(kk===''||kk==='общий'||kk==='general'){gen=lst(C[k]);return}
+    var col=colOf(k);
+    if(!col){console.warn('comissions.js: не найдена колонна «'+k+'», запись пропущена');return}
+    var r=lst(C[k]);if(hasAny(r))pc[col]=r});
+  if(!hasAny(gen)&&!Object.keys(pc).length)return; /* пустой шаблон файла не отменяет config.js */
+  PRE={columns:COLS.slice(),members:cp5(gen),comm:pc};
+})();
 var REMOTE=null,REMOTE_BAD=false;
 (function(){
   var sh=/^#c=(\d+)-([\d.]+)-(\d+)-(\d+)$/.exec(location.hash);
@@ -189,11 +210,23 @@ $('b-save').onclick=function(){
   else{$('e-set').textContent='Браузер не разрешил сохранить настройки. Они действуют до закрытия страницы; для переноса используйте «Показать настройки».';refreshStart()}
 };
 $('b-exp').onclick=function(){applyCfg(readSettingsForm());$('set-json').value=JSON.stringify({columns:CFG.columns,members:CFG.members,comm:CFG.comm,url:CFG.url,key:CFG.key});$('set-json').select()};
+function colNo(c){var m=/№\s*(\d+)\s*$/.exec(c);return m?parseInt(m[1],10):null}
+function commFileText(){
+  function rows(a){return a.filter(function(m){return m.n}).map(function(m){return '    ['+JSON.stringify(m.n)+', '+JSON.stringify(m.p)+']'}).join(',\n')}
+  var out=['/* Составы комиссий по автоколоннам. Файл лежит в репозитории рядом с index.html.',
+  '   Формат строки: ["ФИО", "Должность"]. В составе не больше 5 человек.',
+  '   Ключ: номер колонны (33) или "общий" (подставляется колоннам без своего состава).',
+  '   После изменения файла увеличьте число ?v=… у comissions.js в index.html, чтобы браузеры подхватили правку. */',
+  'var COMISSIONS = {'];
+  var parts=['  "общий": [\n'+rows(CFG.members)+'\n  ]'];
+  COLS.forEach(function(c){var r=CFG.comm[c];if(hasAny(r)){var no=colNo(c);parts.push('  '+(no!==null?no:JSON.stringify(c))+': [\n'+rows(r)+'\n  ]')}});
+  return out.join('\n')+'\n'+parts.join(',\n')+'\n};\n';
+}
 $('b-cfgjs').onclick=function(){
   applyCfg(readSettingsForm());
-  $('set-json').value='var PRESET='+JSON.stringify({columns:CFG.columns,members:CFG.members,comm:CFG.comm})+';';
+  $('set-json').value=commFileText();
   $('set-json').select();
-  $('m-set').textContent='Скопируйте весь этот текст и сохраните его в репозитории GitHub как файл config.js рядом с index.html. После этого ссылки для водителей станут короткими.';
+  $('m-set').textContent='Скопируйте весь этот текст и сохраните в репозитории GitHub как файл comissions.js рядом с index.html (Add file → Create new file). После этого составы будут одинаковыми на всех компьютерах, а ссылки для водителей станут короткими.';
 };
 $('b-imp').onclick=function(){
   try{applyCfg(JSON.parse($('set-json').value));fillSettings();$('m-set').textContent='Загружено. Нажмите «Сохранить», чтобы применить.'}
@@ -207,7 +240,7 @@ $('b-imp').onclick=function(){
   $('qcnt').textContent=DATA[0].q.length;
   DATA.forEach(function(t){var o=document.createElement('option');o.value=t.n;o.textContent='Билет №'+t.n;$('tk').appendChild(o)});
   loadCfg();
-  if(PRE){CFG.columns=PRE.columns.slice();CFG.members=[];for(var pi=0;pi<5;pi++){var pm=PRE.members[pi]||{};CFG.members.push({n:clean(pm.n),p:clean(pm.p)})}}
+  if(PRE){CFG.columns=PRE.columns.slice();if(hasAny(PRE.members)){CFG.members=[];for(var pi=0;pi<5;pi++){var pm=PRE.members[pi]||{};CFG.members.push({n:clean(pm.n),p:clean(pm.p)})}}}
   if(PRE&&PRE.comm&&typeof PRE.comm==='object'){COLS.forEach(function(c){if(Array.isArray(PRE.comm[c])){var r=cp5(PRE.comm[c]);if(hasAny(r))CFG.comm[c]=r}})} /* состав из config.js главнее сохранённого в браузере */
   CFG.columns=COLS.slice();
   if(REMOTE)applyRemote();
