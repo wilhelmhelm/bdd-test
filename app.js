@@ -43,7 +43,7 @@ var COLS=[
   'Автотранспортное подразделение, Автоколонна №36'
 ];
 var LS='iteco_bdd_cfg_v1';
-var CFG={columns:[],members:[],url:REG_URL,key:REG_KEY,lastCol:''};
+var CFG={columns:[],members:[],comm:{},url:REG_URL,key:REG_KEY,lastCol:''}; /* members — общий состав комиссии; comm — свой состав для отдельных колонн: {название колонны: [5 человек]} */
 for(var mi=0;mi<5;mi++)CFG.members.push({n:'',p:''});
 var S={};
 function $(id){return document.getElementById(id)}
@@ -62,7 +62,7 @@ var REMOTE=null,REMOTE_BAD=false;
   var sh=/^#c=(\d+)-([\d.]+)-(\d+)-(\d+)$/.exec(location.hash);
   if(sh){
     if(!PRE){REMOTE_BAD=true;return}
-    var u=COLS[+sh[1]],ms=sh[2].split('.').map(function(i){return PRE.members[+i]}).filter(function(x){return x&&x.n});
+    var u=COLS[+sh[1]],pl=presetList(u),ms=sh[2].split('.').map(function(i){return pl[+i]}).filter(function(x){return x&&x.n});
     if(!u||!ms.length){REMOTE_BAD=true;return}
     REMOTE={u:u,m:ms,e:+sh[3],t:+sh[4]};return;
   }
@@ -71,7 +71,7 @@ var REMOTE=null,REMOTE_BAD=false;
 })();
 function applyRemote(){
   document.body.classList.add('remote');
-  CFG.columns=[REMOTE.u];CFG.lastCol=REMOTE.u;CFG.members=[];
+  CFG.columns=[REMOTE.u];CFG.lastCol=REMOTE.u;CFG.members=[];CFG.comm={};
   for(var i=0;i<5;i++){var x=REMOTE.m[i]||{};CFG.members.push({n:clean(x.n),p:clean(x.p)})}
 }
 function afterRemote(){
@@ -100,45 +100,87 @@ function applyCfg(o){
   if(!o||typeof o!=='object')return;
   CFG.columns=COLS.slice(); /* список колонн всегда берётся из кода */
   if(Array.isArray(o.members)){for(var i=0;i<5;i++){var m=o.members[i]||{};CFG.members[i]={n:clean(m.n),p:clean(m.p)}}}
+  if(o.comm&&typeof o.comm==='object'){CFG.comm={};COLS.forEach(function(c){if(Array.isArray(o.comm[c])){var r=cp5(o.comm[c]);if(hasAny(r))CFG.comm[c]=r}})}
   CFG.url=REG_URL;CFG.key=REG_KEY; /* адрес и ключ всегда берутся из файла, сохранённые в браузере игнорируются */
   if(typeof o.lastCol==='string')CFG.lastCol=o.lastCol;
 }
 function loadCfg(){try{var r=localStorage.getItem(LS);if(r)applyCfg(JSON.parse(r))}catch(e){}}
 function saveCfg(){if(REMOTE)return true;try{localStorage.setItem(LS,JSON.stringify(CFG));return true}catch(e){return false}}
-function members(){return CFG.members.map(function(m,i){return {i:i,n:m.n,p:m.p}}).filter(function(m){return m.n})}
+/* ---------- состав комиссии: общий и для отдельных колонн ---------- */
+function blank5(){var r=[];for(var i=0;i<5;i++)r.push({n:'',p:''});return r}
+function cp5(a){var r=[];for(var i=0;i<5;i++){var m=(a&&a[i])||{};r.push({n:clean(m.n),p:clean(m.p)})}return r}
+function hasAny(a){return Array.isArray(a)&&a.some(function(m){return m&&clean(m.n)})}
+function sameList(a,b){a=cp5(a);b=cp5(b);for(var i=0;i<5;i++)if(a[i].n!==b[i].n||a[i].p!==b[i].p)return false;return true}
+function commList(unit){var c=CFG.comm[unit];return hasAny(c)?c:CFG.members} /* свой состав колонны, а если не задан — общий */
+function presetList(unit){return(PRE&&PRE.comm&&hasAny(PRE.comm[unit]))?PRE.comm[unit]:PRE.members}
+function members(unit){return commList(unit).map(function(m,i){return {i:i,n:m.n,p:m.p}}).filter(function(m){return m.n})}
 
+function renderComm(){
+  var unit=$('unit').value,box=$('comm');box.innerHTML='';
+  var own=hasAny(CFG.comm[unit]),ms=members(unit);
+  if(!ms.length){box.appendChild(el('div','hint','Состав комиссии не задан. Нажмите «Изменить состав» ниже или откройте «Настройки».'))}
+  ms.forEach(function(m){
+    var lab=el('label','chk');var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.value=m.i;
+    lab.appendChild(cb);lab.appendChild(el('span',null,m.n+(m.p?' — '+m.p:'')));box.appendChild(lab);
+  });
+  $('comm-src').textContent=!ms.length?'':own?'Состав сохранён для этой колонны.':unit?'Для этой колонны свой состав не задан, подставлен общий.':'Показан общий состав.';
+}
 function refreshStart(){
   var sel=$('unit');sel.innerHTML='';
   var o0=document.createElement('option');o0.value='';o0.textContent=CFG.columns.length?'— выберите —':'— сначала добавьте в «Настройках» —';sel.appendChild(o0);
   CFG.columns.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
   if(CFG.lastCol&&CFG.columns.indexOf(CFG.lastCol)>=0)sel.value=CFG.lastCol;
-  var box=$('comm');box.innerHTML='';
-  var ms=members();
-  if(!ms.length){box.appendChild(el('div','hint','Состав комиссии не задан. Откройте «Настройки» и впишите членов комиссии.'))}
-  ms.forEach(function(m){
-    var lab=el('label','chk');var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.value=m.i;
-    lab.appendChild(cb);lab.appendChild(el('span',null,m.n+(m.p?' — '+m.p:'')));box.appendChild(lab);
-  });
+  renderComm();
   $('reg-info').textContent=CFG.url?'Результаты проверки будут отправлены в реестр.':'Реестр не подключён: результат остаётся только в протоколе (подключается в «Настройках»).';
 }
-function fillSettings(){
-  $('set-cols').value=CFG.columns.join('\n');
+$('unit').onchange=function(){renderComm()};
+
+/* рабочая копия составов на экране «Настройки» */
+var EDIT={scope:'',def:blank5(),comm:{}};
+function buildScope(){
+  var s=$('set-scope');s.innerHTML='';
+  var o=document.createElement('option');o.value='';o.textContent='Общий состав (для колонн без своего)';s.appendChild(o);
+  COLS.forEach(function(c){var x=document.createElement('option');x.value=c;x.textContent=(EDIT.comm[c]?'✓ ':'')+c;s.appendChild(x)});
+  s.value=EDIT.scope;
+}
+function rowsRender(){
   var box=$('set-members');box.innerHTML='';
+  var rows=EDIT.scope?(EDIT.comm[EDIT.scope]||blank5()):EDIT.def;
   for(var i=0;i<5;i++){
     var r=el('div','mrow');r.appendChild(el('span',null,String(i+1)));
-    var a=document.createElement('input');a.type='text';a.id='m-n'+i;a.placeholder='ФИО';a.value=CFG.members[i].n;
-    var b=document.createElement('input');b.type='text';b.id='m-p'+i;b.placeholder='Должность';b.value=CFG.members[i].p;
+    var a=document.createElement('input');a.type='text';a.id='m-n'+i;a.placeholder='ФИО';a.value=rows[i].n;
+    var b=document.createElement('input');b.type='text';b.id='m-p'+i;b.placeholder='Должность';b.value=rows[i].p;
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
   }
+  $('b-comm-copy').classList.toggle('hidden',!EDIT.scope);
+  $('set-scope-hint').textContent=EDIT.scope
+    ?'Состав запоминается только для этой колонны. Если оставить все строки пустыми, для неё будет подставляться общий состав. Отметка ✓ в списке — у колонны уже есть свой состав.'
+    :'Общий состав подставляется для всех колонн, у которых свой состав не задан. Пустые строки игнорируются. На каждой проверке можно отметить, кто из комиссии присутствует.';
+}
+function rowsStash(){
+  if(!$('m-n0'))return;
+  var r=[];for(var i=0;i<5;i++)r.push({n:$('m-n'+i).value,p:$('m-p'+i).value});
+  r=cp5(r);
+  if(EDIT.scope){if(hasAny(r))EDIT.comm[EDIT.scope]=r;else delete EDIT.comm[EDIT.scope]}
+  else EDIT.def=r;
+}
+function fillSettings(scope){
+  EDIT.def=cp5(CFG.members);EDIT.comm={};
+  COLS.forEach(function(c){if(hasAny(CFG.comm[c]))EDIT.comm[c]=cp5(CFG.comm[c])});
+  EDIT.scope=(scope&&COLS.indexOf(scope)>=0)?scope:'';
+  $('set-cols').value=CFG.columns.join('\n');
+  buildScope();rowsRender();
   $('set-url').value=CFG.url;$('set-key').value=CFG.key;$('set-url').readOnly=true;$('set-key').readOnly=true;
   $('e-set').textContent='';$('m-set').textContent='';
 }
 function readSettingsForm(){
-  var o={columns:$('set-cols').value.split('\n'),members:[],url:$('set-url').value,key:$('set-key').value,lastCol:CFG.lastCol};
-  for(var i=0;i<5;i++)o.members.push({n:$('m-n'+i).value,p:$('m-p'+i).value});
-  return o;
+  rowsStash();
+  return {columns:$('set-cols').value.split('\n'),members:EDIT.def,comm:EDIT.comm,url:$('set-url').value,key:$('set-key').value,lastCol:CFG.lastCol};
 }
-$('b-settings').onclick=function(){fillSettings();show('s-set')};
+$('set-scope').onchange=function(){rowsStash();EDIT.scope=this.value;buildScope();rowsRender()};
+$('b-comm-copy').onclick=function(){if(!EDIT.scope)return;EDIT.comm[EDIT.scope]=cp5(EDIT.def);buildScope();rowsRender()};
+$('b-comm-edit').onclick=function(){if($('unit').value)CFG.lastCol=$('unit').value;fillSettings($('unit').value);show('s-set')};
+$('b-settings').onclick=function(){if($('unit').value)CFG.lastCol=$('unit').value;fillSettings();show('s-set')}; /* выбранная колонна запоминается, чтобы после «Сохранить» она не сбрасывалась */
 $('b-cancel').onclick=function(){refreshStart();show('s-start')};
 $('b-save').onclick=function(){
   applyCfg(readSettingsForm());
@@ -146,10 +188,10 @@ $('b-save').onclick=function(){
   if(saveCfg()){refreshStart();show('s-start')}
   else{$('e-set').textContent='Браузер не разрешил сохранить настройки. Они действуют до закрытия страницы; для переноса используйте «Показать настройки».';refreshStart()}
 };
-$('b-exp').onclick=function(){applyCfg(readSettingsForm());$('set-json').value=JSON.stringify({columns:CFG.columns,members:CFG.members,url:CFG.url,key:CFG.key});$('set-json').select()};
+$('b-exp').onclick=function(){applyCfg(readSettingsForm());$('set-json').value=JSON.stringify({columns:CFG.columns,members:CFG.members,comm:CFG.comm,url:CFG.url,key:CFG.key});$('set-json').select()};
 $('b-cfgjs').onclick=function(){
   applyCfg(readSettingsForm());
-  $('set-json').value='var PRESET='+JSON.stringify({columns:CFG.columns,members:CFG.members})+';';
+  $('set-json').value='var PRESET='+JSON.stringify({columns:CFG.columns,members:CFG.members,comm:CFG.comm})+';';
   $('set-json').select();
   $('m-set').textContent='Скопируйте весь этот текст и сохраните его в репозитории GitHub как файл config.js рядом с index.html. После этого ссылки для водителей станут короткими.';
 };
@@ -166,6 +208,7 @@ $('b-imp').onclick=function(){
   DATA.forEach(function(t){var o=document.createElement('option');o.value=t.n;o.textContent='Билет №'+t.n;$('tk').appendChild(o)});
   loadCfg();
   if(PRE){CFG.columns=PRE.columns.slice();CFG.members=[];for(var pi=0;pi<5;pi++){var pm=PRE.members[pi]||{};CFG.members.push({n:clean(pm.n),p:clean(pm.p)})}}
+  if(PRE&&PRE.comm&&typeof PRE.comm==='object'){COLS.forEach(function(c){if(Array.isArray(PRE.comm[c])){var r=cp5(PRE.comm[c]);if(hasAny(r))CFG.comm[c]=r}})} /* состав из config.js главнее сохранённого в браузере */
   CFG.columns=COLS.slice();
   if(REMOTE)applyRemote();
   refreshStart();
@@ -175,16 +218,17 @@ $('b-imp').onclick=function(){
 
 /* ---------- ссылка для удалённой проверки ---------- */
 $('b-link').onclick=function(){
-  var unit=$('unit').value,comm=[];
-  Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=CFG.members[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
+  var unit=$('unit').value,comm=[],lst=commList(unit);
+  Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=lst[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
   if(!unit){$('e-start').textContent='Для ссылки выберите автоколонну.';return}
   if(!comm.length){$('e-start').textContent='Для ссылки отметьте хотя бы одного члена комиссии.';return}
   $('e-start').textContent='';
   var me=parseInt($('maxerr').value,10);if(isNaN(me)||me<0)me=0;
   var o={u:unit,m:comm,e:me,t:parseInt($('tk').value,10)||0};
   var base=location.href.split('#')[0],ui=PRE?COLS.indexOf(unit):-1,mi=[];
-  if(PRE)Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){mi.push(cb.value)});
-  $('lnk').value=(PRE&&ui>=0)?base+'#c='+ui+'-'+mi.join('.')+'-'+me+'-'+o.t:base+'#t='+b64e(JSON.stringify(o));
+  var shortOk=PRE&&ui>=0&&sameList(presetList(unit),lst); /* короткая ссылка хранит лишь номера людей из config.js, поэтому годится только если состав там такой же */
+  if(shortOk)Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){mi.push(cb.value)});
+  $('lnk').value=shortOk?base+'#c='+ui+'-'+mi.join('.')+'-'+me+'-'+o.t:base+'#t='+b64e(JSON.stringify(o));
   $('lnk-box').classList.remove('hidden');
   if(location.protocol==='file:')$('lnk-hint').textContent='Внимание: страница открыта как локальный файл, такая ссылка заработает только у вас. Сначала разместите страницу на хостинге и откройте её по https-адресу.';
 };
@@ -198,7 +242,7 @@ $('b-start').onclick=function(){
   var unit=$('unit').value;
   var fio=clean($('fio').value);
   var dt=$('dt').value;
-  var comm=[];Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=CFG.members[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
+  var comm=[],lst=commList(unit);Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=lst[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
   if(!unit){$('e-start').textContent='Выберите автоколонну / подразделение (список настраивается в «Настройках»).';return}
   if(fio.split(' ').length<2){$('e-start').textContent='Введите ФИО полностью (фамилия и имя).';$('fio').focus();return}
   if(!dt){$('e-start').textContent='Укажите дату тестирования.';return}

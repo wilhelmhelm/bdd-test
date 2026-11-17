@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 <img class="bgimg" src="img/bg.jpg" alt="">
@@ -30,6 +30,8 @@
     </div>
     <label>Комиссия по проверке (отметьте присутствующих)</label>
     <div id="comm"></div>
+    <div class="acts" style="margin-top:4px"><button class="btn sec small" id="b-comm-edit">✎ Изменить состав для этой колонны</button></div>
+    <p class="hint" id="comm-src"></p>
     <div class="row">
       <div><label for="maxerr">Допустимо ошибок для зачёта</label><input type="number" id="maxerr" min="0" max="20" value="1"></div>
       <div></div>
@@ -62,8 +64,11 @@
     <textarea id="set-cols" rows="8" readonly></textarea>
     <p class="hint">Список из 36 автоколонн зашит в код страницы и здесь не редактируется.</p>
     <h3>Состав комиссии (до 5 человек)</h3>
+    <label for="set-scope">Для какой колонны задать состав</label>
+    <select id="set-scope"></select>
     <div id="set-members"></div>
-    <p class="hint">Пустые строки игнорируются. На каждой проверке можно отметить, кто из комиссии присутствует.</p>
+    <button class="btn sec small" id="b-comm-copy" style="margin-top:6px">Скопировать из общего состава</button>
+    <p class="hint" id="set-scope-hint"></p>
     <h3>Реестр проверок (Google Таблица)</h3>
     <label for="set-url">Адрес скрипта (оканчивается на /exec)</label>
     <input type="text" id="set-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
@@ -134,7 +139,7 @@
 
 </div>
 <script src="config.js"></script>
-<script src="data.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script src="data.js?v=12"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
