@@ -88,3 +88,5 @@ body{background:#fff}
   .proto{border:0;padding:0;border-radius:0;background:transparent}
   .res.ok,.res.no,.ans th,.comm th,.info td.k{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+.lock #b-settings,.lock #b-comm-edit{display:none!important} /* состав комиссий менять на странице нельзя (COMM_LOCKED в app.js) */
+.imgfail{border:1px dashed #b3261e;border-radius:8px;padding:12px;margin:4px 0 12px;color:#b3261e;cursor:pointer;font-size:14px}

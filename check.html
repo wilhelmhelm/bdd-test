@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Проверка файлов сайта</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:760px;margin:24px auto;padding:0 14px;color:#1c2b25}
+h1{font-size:20px;color:#006a4e}
+.sum{padding:12px 14px;border-radius:8px;margin:12px 0;font-weight:bold}
+.ok{background:#e3f3ec;color:#006a4e}.bad{background:#fdecea;color:#b3261e}.wait{background:#eef2f0}
+table{border-collapse:collapse;width:100%;font-size:14px}td,th{border:1px solid #cfd9d4;padding:4px 8px;text-align:left}
+td.y{color:#006a4e;font-weight:bold}td.n{color:#b3261e;font-weight:bold}
+.hint{color:#5b6b64;font-size:13px}
+</style>
+</head>
+<body>
+<h1>Проверка файлов сайта</h1>
+<p class="hint">Страница проверяет, что в репозитории есть все рисунки к вопросам и служебные картинки. Ничего не меняет, можно открывать в любой момент.</p>
+<div class="sum wait" id="sum">Проверяю…</div>
+<div id="aff"></div>
+<table id="tab"><tr><th>Файл</th><th>Состояние</th></tr></table>
+<script src="data.js"></script>
+<script>
+var FILES=[];
+Object.keys(IMGS).forEach(function(k){FILES.push({id:k,path:IMGS[k]})});
+['img/bg.jpg','img/logo.png','img/favicon.png','img/apple-touch-icon.png'].forEach(function(p){FILES.push({id:null,path:p})});
+var tab=document.getElementById('tab'),left=FILES.length,bad=[];
+function row(f,okk){
+  var tr=document.createElement('tr');
+  tr.innerHTML='<td>'+f.path+'</td><td class="'+(okk?'y':'n')+'">'+(okk?'✓ есть':'✗ НЕ НАЙДЕН')+'</td>';
+  if(okk)tab.appendChild(tr);else tab.insertBefore(tr,tab.rows[1]||null);
+}
+function done(){
+  var s=document.getElementById('sum');
+  if(!bad.length){s.className='sum ok';s.textContent='Всё в порядке: найдено файлов — '+FILES.length+'.';return}
+  s.className='sum bad';s.textContent='Не найдено файлов: '+bad.length+' из '+FILES.length+'. Загрузите их в папку img репозитория.';
+  var ids={};bad.forEach(function(f){if(f.id)ids[f.id]=f.path});
+  var lines=[];
+  DATA.forEach(function(t){t.q.forEach(function(q,i){(q.i||[]).forEach(function(id){if(ids[id])lines.push('Билет '+t.n+', вопрос '+(i+1)+' — нет файла '+ids[id])})})});
+  if(lines.length)document.getElementById('aff').innerHTML='<p><b>Затронуты вопросы:</b></p><ul><li>'+lines.join('</li><li>')+'</li></ul>';
+}
+FILES.forEach(function(f){
+  var im=new Image();
+  im.onload=function(){row(f,true);if(--left===0)done()};
+  im.onerror=function(){bad.push(f);row(f,false);if(--left===0)done()};
+  im.src=f.path+'?c='+Date.now();   /* без кэша, чтобы видеть реальное состояние репозитория */
+});
+</script>
+</body>
+</html>

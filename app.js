@@ -306,6 +306,23 @@ function buildDots(){
   var c=$('dots');c.innerHTML='';
   S.t.q.forEach(function(_,i){var b=el('button','dot',String(i+1));b.onclick=function(){S.cur=i;render()};c.appendChild(b)});
 }
+/* рисунок к вопросу: при сбое загрузки 3 повторные попытки, затем сообщение с именем файла и повтором по нажатию */
+function makeImg(id){
+  var src=IMGS[id],box=document.createElement('div'),tries=0;
+  function load(){
+    box.innerHTML='';
+    var i=document.createElement('img');i.className='qimg';i.alt='Рисунок к вопросу';
+    i.onerror=function(){
+      if(tries<3){tries++;setTimeout(load,700*tries);return}
+      box.innerHTML='';
+      var f=el('div','imgfail','Рисунок не загрузился ('+String(src).replace(/^.*\//,'')+'). Проверьте интернет и нажмите здесь, чтобы повторить. Если не помогает, сообщите администратору.');
+      f.onclick=function(){tries=0;load()};box.appendChild(f);
+    };
+    i.src=src+(tries?(src.indexOf('?')<0?'?':'&')+'r='+tries+'_'+Date.now():'');
+    box.appendChild(i);
+  }
+  load();return box;
+}
 function render(){
   var q=S.t.q[S.cur],n=S.t.q.length;
   $('t-num').textContent='Вопрос '+(S.cur+1)+' из '+n;
@@ -314,7 +331,8 @@ function render(){
   $('bar').style.width=(done/n*100)+'%';
   $('q-text').textContent=q.t;
   var im=$('q-imgs');im.innerHTML='';
-  q.i.forEach(function(id){var i=document.createElement('img');i.src=IMGS[id];i.className='qimg';i.alt='Рисунок к вопросу';im.appendChild(i)});
+  q.i.forEach(function(id){im.appendChild(makeImg(id))});
+  if(!S.pre){S.pre=1;S.t.q.forEach(function(x){x.i.forEach(function(id){(new Image()).src=IMGS[id]})})} /* заранее подгружаем рисунки всего билета */
   var o=$('q-opts');o.innerHTML='';
   q.o.forEach(function(txt,k){
     var b=el('button','opt'+(S.ans[S.cur]===k?' sel':''));
