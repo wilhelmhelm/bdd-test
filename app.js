@@ -444,8 +444,8 @@ function finish(){
 /* ---------- результаты из реестра (для администратора) ---------- */
 var AK='iteco_bdd_akey',REG={h:{},rows:[]};
 function regErr(code){var e=new Error(code);e.code=code;return e}
-function regGet(akey){
-  var url=REG_URL+'?akey='+encodeURIComponent(akey);
+function regGet(akey,q){
+  var url=REG_URL+'?akey='+encodeURIComponent(akey)+(q?'&q='+encodeURIComponent(q):'');
   return fetch(url).then(function(r){
     return r.text().then(function(t){try{return JSON.parse(t)}catch(x){throw regErr('format')}});
   }).catch(function(){
@@ -475,7 +475,11 @@ function renderList(){
     var td=el('td'),bt=el('button','btn small','Протокол');bt.onclick=function(){openRowProtocol(row)};td.appendChild(bt);tr.appendChild(td);
     tb.appendChild(tr);shown++;
   });
-  $('reg-msg').textContent='Показано: '+shown+' из '+REG.rows.length;$('reg-msg').style.color='';
+  var S2=REG.search;
+  $('reg-msg').textContent=S2
+    ?'Найдено по запросу «'+S2.q+'»: '+S2.total+(S2.total>REG.rows.length?' (показаны '+REG.rows.length+' самых новых; уточните запрос)':'')+(shown!==REG.rows.length?' · после фильтра: '+shown:'')
+    :'Показано: '+shown+' из '+REG.rows.length+' (последние записи)';
+  $('reg-msg').style.color='';
 }
 function openRowProtocol(row){
   var n=parseInt(rg(row,'Билет'),10),t=null;
@@ -504,14 +508,16 @@ $('b-reg').onclick=function(){try{$('akey').value=localStorage.getItem(AK)||''}c
 $('b-reg-back').onclick=function(){show('s-start')};
 $('b-back').onclick=function(){show('s-reg')};
 $('rflt').oninput=renderList;
-$('b-load').onclick=function(){
+function loadReg(q){
   var k=$('akey').value.trim(),m=$('reg-msg');
   if(!k){m.textContent='Введите ключ администратора.';m.style.color='#b3261e';return}
-  m.textContent='Загрузка…';m.style.color='';
-  regGet(k).then(function(d){
+  if(q&&q.length<2){m.textContent='Для поиска по всей таблице введите не менее 2 символов.';m.style.color='#b3261e';return}
+  m.textContent=q?'Поиск по всей таблице…':'Загрузка…';m.style.color='';
+  regGet(k,q).then(function(d){
     if(!d||d.error){m.textContent=d&&d.error==='denied'?'Неверный ключ администратора.':'Ошибка ответа сервера.';m.style.color='#b3261e';return}
+    if(q&&d.search!==true){m.textContent='Скрипт таблицы пока не поддерживает поиск: замените функцию doGet на новую и разверните новую версию (Развернуть → Управление развёртываниями → Новая версия).';m.style.color='#b3261e';return}
     try{localStorage.setItem(AK,k)}catch(e){}
-    try{REG.h={};(d.headers||[]).forEach(function(h,i){REG.h[h]=i});REG.rows=d.rows||[];renderList()}
+    try{REG.h={};(d.headers||[]).forEach(function(h,i){REG.h[h]=i});REG.rows=d.rows||[];REG.search=q?{q:q,total:d.total==null?(d.rows||[]).length:d.total}:null;renderList()}
     catch(e){m.textContent='Данные получены, но не отобразились: '+e.message;m.style.color='#b3261e'}
   }).catch(function(e){
     var c=e&&e.code,msg;
@@ -521,7 +527,10 @@ $('b-load').onclick=function(){
     else msg='Не удалось получить данные: '+(e&&e.message?e.message:'неизвестная ошибка');
     m.textContent=msg;m.style.color='#b3261e';
   });
-};
+}
+$('b-load').onclick=function(){loadReg('')};
+$('b-find').onclick=function(){loadReg(clean($('rflt').value))};
+$('rflt').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();loadReg(clean($('rflt').value))}};
 $('b-print').onclick=function(){window.print()};
 flushPending();
 $('b-new').onclick=function(){
