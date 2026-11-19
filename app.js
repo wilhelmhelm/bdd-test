@@ -1,4 +1,6 @@
 var REG_URL = 'https://script.google.com/macros/s/AKfycbxCXToB7eu_yq8T6v0mwWOtoNV5dBe4cXr7WaQq-TO9ACaPNcowYtIAVcJkW_GOiA5Myg/exec';
+/* true — состав комиссий задаётся ТОЛЬКО в файле comissions.js: на странице его нельзя изменить, кнопки «Настройки» и «Изменить состав» скрыты, сохранённое в браузерах игнорируется. false — вернуть ручное редактирование. */
+var COMM_LOCKED = true;
 var REG_KEY = 'I01a1kfzUSBSUKdVgdLgx';
 var LOGO = 'img/logo.png';
 
@@ -12,14 +14,12 @@ var COLS=[
   'Автотранспортное подразделение, Автоколонна №5',
   'Автотранспортное подразделение, Автоколонна №6',
   'Автотранспортное подразделение, Автоколонна №7',
-  'Автотранспортное подразделение, Автоколонна №7 (зерновозы)',
   'Автотранспортное подразделение, Автоколонна №8',
   'Автотранспортное подразделение, Автоколонна №9',
   'Автотранспортное подразделение, Автоколонна №10',
   'Автотранспортное подразделение, Автоколонна №11',
   'Автотранспортное подразделение, Автоколонна №12',
   'Автотранспортное подразделение, Автоколонна №13',
-  'Автотранспортное подразделение, Автоколонна №13 (зерновозы)',
   'Автотранспортное подразделение, Автоколонна №14',
   'Автотранспортное подразделение, Автоколонна №15',
   'Автотранспортное подразделение, Автоколонна №16',
@@ -30,7 +30,6 @@ var COLS=[
   'Автотранспортное подразделение, Автоколонна №21',
   'Автотранспортное подразделение, Автоколонна №22',
   'Автотранспортное подразделение, Автоколонна №23',
-  'Автотранспортное подразделение, Автоколонна №23 (зерновозы)',
   'Автотранспортное подразделение, Автоколонна №24',
   'Автотранспортное подразделение, Автоколонна №25',
   'Автотранспортное подразделение, Автоколонна №26',
@@ -46,7 +45,7 @@ var COLS=[
   'Автотранспортное подразделение, Автоколонна №36'
 ];
 var LS='iteco_bdd_cfg_v1';
-var CFG={columns:[],members:[],url:REG_URL,key:REG_KEY,lastCol:''};
+var CFG={columns:[],members:[],comm:{},url:REG_URL,key:REG_KEY,lastCol:''}; /* members — общий состав комиссии; comm — свой состав для отдельных колонн: {название колонны: [5 человек]} */
 for(var mi=0;mi<5;mi++)CFG.members.push({n:'',p:''});
 var S={};
 function $(id){return document.getElementById(id)}
@@ -59,13 +58,36 @@ function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim()}
 function b64e(t){return btoa(encodeURIComponent(t).replace(/%([0-9A-F]{2})/g,function(m,h){return String.fromCharCode(parseInt(h,16))})).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function b64d(x){x=x.replace(/-/g,'+').replace(/_/g,'/');while(x.length%4)x+='=';return decodeURIComponent(atob(x).split('').map(function(c){return '%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)}).join(''))}
 /* ---------- удалённый режим: #t=... в ссылке ---------- */
-var PRE=(window.PRESET&&Array.isArray(window.PRESET.columns)&&Array.isArray(window.PRESET.members))?window.PRESET:null;
+var PRE=(window.PRESET&&Array.isArray(window.PRESET.columns)&&Array.isArray(window.PRESET.members))?window.PRESET:null; /* старый способ: config.js */
+/* Составы комиссий из файла comissions.js (главнее config.js): ключ "общий" или номер колонны (33) либо её полное название */
+(function(){
+  var C=window.COMISSIONS;if(!C||typeof C!=='object')return;
+  var gen=[],pc={},bad=false;
+  function lst(a){var r=[];(Array.isArray(a)?a:[]).forEach(function(x){
+    if(x==null){bad=true;return} /* пустая запись: обычно пропущена запятая между людьми */
+    var n,p;if(Array.isArray(x)){n=x[0];p=x[1]}else if(x&&typeof x==='object'){n=x.n;p=x.p}else{n=x;p=''}
+    n=clean(n);if(!n)return;if(r.length>=5){console.warn('comissions.js: в составе больше 5 человек, лишние не учтены: '+n);return}
+    r.push({n:n,p:clean(p)})});return cp5(r)}
+  function colOf(k){
+    if(COLS.indexOf(k)>=0)return k;
+    if(/^\d+$/.test(String(k).trim())){var re=new RegExp('№\\s*'+String(k).trim()+'$');for(var i=0;i<COLS.length;i++)if(re.test(COLS[i]))return COLS[i]}
+    return null}
+  Object.keys(C).forEach(function(k){
+    var kk=String(k).trim().toLowerCase();
+    if(kk===''||kk==='общий'||kk==='general'){gen=lst(C[k]);return}
+    var col=colOf(k);
+    if(!col){console.warn('comissions.js: не найдена колонна «'+k+'», запись пропущена');return}
+    var r=lst(C[k]);if(hasAny(r))pc[col]=r});
+  window.COMM_BAD=bad;
+  if(!hasAny(gen)&&!Object.keys(pc).length)return; /* пустой шаблон файла не отменяет config.js */
+  PRE={columns:COLS.slice(),members:cp5(gen),comm:pc};
+})();
 var REMOTE=null,REMOTE_BAD=false;
 (function(){
   var sh=/^#c=(\d+)-([\d.]+)-(\d+)-(\d+)$/.exec(location.hash);
   if(sh){
     if(!PRE){REMOTE_BAD=true;return}
-    var u=COLS[+sh[1]],ms=sh[2].split('.').map(function(i){return PRE.members[+i]}).filter(function(x){return x&&x.n});
+    var u=COLS[+sh[1]],pl=presetList(u),ms=sh[2].split('.').map(function(i){return pl[+i]}).filter(function(x){return x&&x.n});
     if(!u||!ms.length){REMOTE_BAD=true;return}
     REMOTE={u:u,m:ms,e:+sh[3],t:+sh[4]};return;
   }
@@ -74,7 +96,7 @@ var REMOTE=null,REMOTE_BAD=false;
 })();
 function applyRemote(){
   document.body.classList.add('remote');
-  CFG.columns=[REMOTE.u];CFG.lastCol=REMOTE.u;CFG.members=[];
+  CFG.columns=[REMOTE.u];CFG.lastCol=REMOTE.u;CFG.members=[];CFG.comm={};
   for(var i=0;i<5;i++){var x=REMOTE.m[i]||{};CFG.members.push({n:clean(x.n),p:clean(x.p)})}
 }
 function afterRemote(){
@@ -102,46 +124,91 @@ function remoteDone(ok,wrong,n){
 function applyCfg(o){
   if(!o||typeof o!=='object')return;
   CFG.columns=COLS.slice(); /* список колонн всегда берётся из кода */
-  if(Array.isArray(o.members)){for(var i=0;i<5;i++){var m=o.members[i]||{};CFG.members[i]={n:clean(m.n),p:clean(m.p)}}}
+  if(!COMM_LOCKED&&Array.isArray(o.members)){for(var i=0;i<5;i++){var m=o.members[i]||{};CFG.members[i]={n:clean(m.n),p:clean(m.p)}}}
+  if(!COMM_LOCKED&&o.comm&&typeof o.comm==='object'){CFG.comm={};COLS.forEach(function(c){if(Array.isArray(o.comm[c])){var r=cp5(o.comm[c]);if(hasAny(r))CFG.comm[c]=r}})}
   CFG.url=REG_URL;CFG.key=REG_KEY; /* адрес и ключ всегда берутся из файла, сохранённые в браузере игнорируются */
   if(typeof o.lastCol==='string')CFG.lastCol=o.lastCol;
 }
 function loadCfg(){try{var r=localStorage.getItem(LS);if(r)applyCfg(JSON.parse(r))}catch(e){}}
 function saveCfg(){if(REMOTE)return true;try{localStorage.setItem(LS,JSON.stringify(CFG));return true}catch(e){return false}}
-function members(){return CFG.members.map(function(m,i){return {i:i,n:m.n,p:m.p}}).filter(function(m){return m.n})}
+/* ---------- состав комиссии: общий и для отдельных колонн ---------- */
+function blank5(){var r=[];for(var i=0;i<5;i++)r.push({n:'',p:''});return r}
+function cp5(a){var r=[];for(var i=0;i<5;i++){var m=(a&&a[i])||{};r.push({n:clean(m.n),p:clean(m.p)})}return r}
+function hasAny(a){return Array.isArray(a)&&a.some(function(m){return m&&clean(m.n)})}
+function sameList(a,b){a=cp5(a);b=cp5(b);for(var i=0;i<5;i++)if(a[i].n!==b[i].n||a[i].p!==b[i].p)return false;return true}
+function commList(unit){var c=CFG.comm[unit];return hasAny(c)?c:CFG.members} /* свой состав колонны, а если не задан — общий */
+function presetList(unit){return(PRE&&PRE.comm&&hasAny(PRE.comm[unit]))?PRE.comm[unit]:PRE.members}
+function members(unit){return commList(unit).map(function(m,i){return {i:i,n:m.n,p:m.p}}).filter(function(m){return m.n})}
 
+function renderComm(){
+  var unit=$('unit').value,box=$('comm');box.innerHTML='';
+  var own=hasAny(CFG.comm[unit]),ms=members(unit);
+  if(COMM_LOCKED&&window.COMM_BAD)box.appendChild(el('div','err','В файле comissions.js есть ошибка в записи состава (возможно, пропущена запятая между людьми). Проверьте состав и сообщите администратору.'));
+  if(!ms.length){box.appendChild(el('div',COMM_LOCKED&&!window.COMISSIONS?'err':'hint',
+    COMM_LOCKED?(window.COMISSIONS?'Состав комиссии для этой колонны не задан в файле comissions.js. Обратитесь к администратору.':'Не удалось прочитать файл comissions.js: он отсутствует или содержит ошибку (проверьте запятые и кавычки). Обратитесь к администратору.')
+    :'Состав комиссии не задан. Нажмите «Изменить состав» ниже или откройте «Настройки».'))}
+  ms.forEach(function(m){
+    var lab=el('label','chk');var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.value=m.i;
+    lab.appendChild(cb);lab.appendChild(el('span',null,m.n+(m.p?' — '+m.p:'')));box.appendChild(lab);
+  });
+  $('comm-src').textContent=!ms.length?'':own?(COMM_LOCKED?'Состав для этой колонны задан в файле comissions.js.':'Состав сохранён для этой колонны.'):unit?'Для этой колонны свой состав не задан, подставлен общий.':'Показан общий состав.';
+}
 function refreshStart(){
   var sel=$('unit');sel.innerHTML='';
   var o0=document.createElement('option');o0.value='';o0.textContent=CFG.columns.length?'— выберите —':'— сначала добавьте в «Настройках» —';sel.appendChild(o0);
   CFG.columns.forEach(function(c){var o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
   if(CFG.lastCol&&CFG.columns.indexOf(CFG.lastCol)>=0)sel.value=CFG.lastCol;
-  var box=$('comm');box.innerHTML='';
-  var ms=members();
-  if(!ms.length){box.appendChild(el('div','hint','Состав комиссии не задан. Откройте «Настройки» и впишите членов комиссии.'))}
-  ms.forEach(function(m){
-    var lab=el('label','chk');var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.value=m.i;
-    lab.appendChild(cb);lab.appendChild(el('span',null,m.n+(m.p?' — '+m.p:'')));box.appendChild(lab);
-  });
+  renderComm();
   $('reg-info').textContent=CFG.url?'Результаты проверки будут отправлены в реестр.':'Реестр не подключён: результат остаётся только в протоколе (подключается в «Настройках»).';
 }
-function fillSettings(){
-  $('set-cols').value=CFG.columns.join('\n');
+$('unit').onchange=function(){renderComm()};
+
+/* рабочая копия составов на экране «Настройки» */
+var EDIT={scope:'',def:blank5(),comm:{}};
+function buildScope(){
+  var s=$('set-scope');s.innerHTML='';
+  var o=document.createElement('option');o.value='';o.textContent='Общий состав (для колонн без своего)';s.appendChild(o);
+  COLS.forEach(function(c){var x=document.createElement('option');x.value=c;x.textContent=(EDIT.comm[c]?'✓ ':'')+c;s.appendChild(x)});
+  s.value=EDIT.scope;
+}
+function rowsRender(){
   var box=$('set-members');box.innerHTML='';
+  var rows=EDIT.scope?(EDIT.comm[EDIT.scope]||blank5()):EDIT.def;
   for(var i=0;i<5;i++){
     var r=el('div','mrow');r.appendChild(el('span',null,String(i+1)));
-    var a=document.createElement('input');a.type='text';a.id='m-n'+i;a.placeholder='ФИО';a.value=CFG.members[i].n;
-    var b=document.createElement('input');b.type='text';b.id='m-p'+i;b.placeholder='Должность';b.value=CFG.members[i].p;
+    var a=document.createElement('input');a.type='text';a.id='m-n'+i;a.placeholder='ФИО';a.value=rows[i].n;
+    var b=document.createElement('input');b.type='text';b.id='m-p'+i;b.placeholder='Должность';b.value=rows[i].p;
     r.appendChild(a);r.appendChild(b);box.appendChild(r);
   }
+  $('b-comm-copy').classList.toggle('hidden',!EDIT.scope);
+  $('set-scope-hint').textContent=EDIT.scope
+    ?'Состав запоминается только для этой колонны. Если оставить все строки пустыми, для неё будет подставляться общий состав. Отметка ✓ в списке — у колонны уже есть свой состав.'
+    :'Общий состав подставляется для всех колонн, у которых свой состав не задан. Пустые строки игнорируются. На каждой проверке можно отметить, кто из комиссии присутствует.';
+}
+function rowsStash(){
+  if(!$('m-n0'))return;
+  var r=[];for(var i=0;i<5;i++)r.push({n:$('m-n'+i).value,p:$('m-p'+i).value});
+  r=cp5(r);
+  if(EDIT.scope){if(hasAny(r))EDIT.comm[EDIT.scope]=r;else delete EDIT.comm[EDIT.scope]}
+  else EDIT.def=r;
+}
+function fillSettings(scope){
+  EDIT.def=cp5(CFG.members);EDIT.comm={};
+  COLS.forEach(function(c){if(hasAny(CFG.comm[c]))EDIT.comm[c]=cp5(CFG.comm[c])});
+  EDIT.scope=(scope&&COLS.indexOf(scope)>=0)?scope:'';
+  $('set-cols').value=CFG.columns.join('\n');
+  buildScope();rowsRender();
   $('set-url').value=CFG.url;$('set-key').value=CFG.key;$('set-url').readOnly=true;$('set-key').readOnly=true;
   $('e-set').textContent='';$('m-set').textContent='';
 }
 function readSettingsForm(){
-  var o={columns:$('set-cols').value.split('\n'),members:[],url:$('set-url').value,key:$('set-key').value,lastCol:CFG.lastCol};
-  for(var i=0;i<5;i++)o.members.push({n:$('m-n'+i).value,p:$('m-p'+i).value});
-  return o;
+  rowsStash();
+  return {columns:$('set-cols').value.split('\n'),members:EDIT.def,comm:EDIT.comm,url:$('set-url').value,key:$('set-key').value,lastCol:CFG.lastCol};
 }
-$('b-settings').onclick=function(){fillSettings();show('s-set')};
+$('set-scope').onchange=function(){rowsStash();EDIT.scope=this.value;buildScope();rowsRender()};
+$('b-comm-copy').onclick=function(){if(!EDIT.scope)return;EDIT.comm[EDIT.scope]=cp5(EDIT.def);buildScope();rowsRender()};
+$('b-comm-edit').onclick=function(){if($('unit').value)CFG.lastCol=$('unit').value;fillSettings($('unit').value);show('s-set')};
+$('b-settings').onclick=function(){if($('unit').value)CFG.lastCol=$('unit').value;fillSettings();show('s-set')}; /* выбранная колонна запоминается, чтобы после «Сохранить» она не сбрасывалась */
 $('b-cancel').onclick=function(){refreshStart();show('s-start')};
 $('b-save').onclick=function(){
   applyCfg(readSettingsForm());
@@ -149,12 +216,24 @@ $('b-save').onclick=function(){
   if(saveCfg()){refreshStart();show('s-start')}
   else{$('e-set').textContent='Браузер не разрешил сохранить настройки. Они действуют до закрытия страницы; для переноса используйте «Показать настройки».';refreshStart()}
 };
-$('b-exp').onclick=function(){applyCfg(readSettingsForm());$('set-json').value=JSON.stringify({columns:CFG.columns,members:CFG.members,url:CFG.url,key:CFG.key});$('set-json').select()};
+$('b-exp').onclick=function(){applyCfg(readSettingsForm());$('set-json').value=JSON.stringify({columns:CFG.columns,members:CFG.members,comm:CFG.comm,url:CFG.url,key:CFG.key});$('set-json').select()};
+function colNo(c){var m=/№\s*(\d+)\s*$/.exec(c);return m?parseInt(m[1],10):null}
+function commFileText(){
+  function rows(a){return a.filter(function(m){return m.n}).map(function(m){return '    ['+JSON.stringify(m.n)+', '+JSON.stringify(m.p)+']'}).join(',\n')}
+  var out=['/* Составы комиссий по автоколоннам. Файл лежит в репозитории рядом с index.html.',
+  '   Формат строки: ["ФИО", "Должность"]. В составе не больше 5 человек.',
+  '   Ключ: номер колонны (33) или "общий" (подставляется колоннам без своего состава).',
+  '   После изменения файла увеличьте число ?v=… у comissions.js в index.html, чтобы браузеры подхватили правку. */',
+  'var COMISSIONS = {'];
+  var parts=['  "общий": [\n'+rows(CFG.members)+'\n  ]'];
+  COLS.forEach(function(c){var r=CFG.comm[c];if(hasAny(r)){var no=colNo(c);parts.push('  '+(no!==null?no:JSON.stringify(c))+': [\n'+rows(r)+'\n  ]')}});
+  return out.join('\n')+'\n'+parts.join(',\n')+'\n};\n';
+}
 $('b-cfgjs').onclick=function(){
   applyCfg(readSettingsForm());
-  $('set-json').value='var PRESET='+JSON.stringify({columns:CFG.columns,members:CFG.members})+';';
+  $('set-json').value=commFileText();
   $('set-json').select();
-  $('m-set').textContent='Скопируйте весь этот текст и сохраните его в репозитории GitHub как файл config.js рядом с index.html. После этого ссылки для водителей станут короткими.';
+  $('m-set').textContent='Скопируйте весь этот текст и сохраните в репозитории GitHub как файл comissions.js рядом с index.html (Add file → Create new file). После этого составы будут одинаковыми на всех компьютерах, а ссылки для водителей станут короткими.';
 };
 $('b-imp').onclick=function(){
   try{applyCfg(JSON.parse($('set-json').value));fillSettings();$('m-set').textContent='Загружено. Нажмите «Сохранить», чтобы применить.'}
@@ -168,7 +247,13 @@ $('b-imp').onclick=function(){
   $('qcnt').textContent=DATA[0].q.length;
   DATA.forEach(function(t){var o=document.createElement('option');o.value=t.n;o.textContent='Билет №'+t.n;$('tk').appendChild(o)});
   loadCfg();
-  if(PRE){CFG.columns=PRE.columns.slice();CFG.members=[];for(var pi=0;pi<5;pi++){var pm=PRE.members[pi]||{};CFG.members.push({n:clean(pm.n),p:clean(pm.p)})}}
+  if(PRE){CFG.columns=PRE.columns.slice();if(hasAny(PRE.members)){CFG.members=[];for(var pi=0;pi<5;pi++){var pm=PRE.members[pi]||{};CFG.members.push({n:clean(pm.n),p:clean(pm.p)})}}}
+  if(PRE&&PRE.comm&&typeof PRE.comm==='object'){COLS.forEach(function(c){if(Array.isArray(PRE.comm[c])){var r=cp5(PRE.comm[c]);if(hasAny(r))CFG.comm[c]=r}})} /* состав из config.js главнее сохранённого в браузере */
+  if(COMM_LOCKED){ /* составы только из comissions.js (или config.js), всё, что сохранено в браузере, игнорируется */
+    document.body.classList.add('lock');
+    CFG.members=PRE?cp5(PRE.members):blank5();CFG.comm={};
+    if(PRE&&PRE.comm)COLS.forEach(function(c){if(hasAny(PRE.comm[c]))CFG.comm[c]=cp5(PRE.comm[c])});
+  }
   CFG.columns=COLS.slice();
   if(REMOTE)applyRemote();
   refreshStart();
@@ -178,16 +263,17 @@ $('b-imp').onclick=function(){
 
 /* ---------- ссылка для удалённой проверки ---------- */
 $('b-link').onclick=function(){
-  var unit=$('unit').value,comm=[];
-  Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=CFG.members[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
+  var unit=$('unit').value,comm=[],lst=commList(unit);
+  Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=lst[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
   if(!unit){$('e-start').textContent='Для ссылки выберите автоколонну.';return}
   if(!comm.length){$('e-start').textContent='Для ссылки отметьте хотя бы одного члена комиссии.';return}
   $('e-start').textContent='';
   var me=parseInt($('maxerr').value,10);if(isNaN(me)||me<0)me=0;
   var o={u:unit,m:comm,e:me,t:parseInt($('tk').value,10)||0};
   var base=location.href.split('#')[0],ui=PRE?COLS.indexOf(unit):-1,mi=[];
-  if(PRE)Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){mi.push(cb.value)});
-  $('lnk').value=(PRE&&ui>=0)?base+'#c='+ui+'-'+mi.join('.')+'-'+me+'-'+o.t:base+'#t='+b64e(JSON.stringify(o));
+  var shortOk=PRE&&ui>=0&&sameList(presetList(unit),lst); /* короткая ссылка хранит лишь номера людей из config.js, поэтому годится только если состав там такой же */
+  if(shortOk)Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){mi.push(cb.value)});
+  $('lnk').value=shortOk?base+'#c='+ui+'-'+mi.join('.')+'-'+me+'-'+o.t:base+'#t='+b64e(JSON.stringify(o));
   $('lnk-box').classList.remove('hidden');
   if(location.protocol==='file:')$('lnk-hint').textContent='Внимание: страница открыта как локальный файл, такая ссылка заработает только у вас. Сначала разместите страницу на хостинге и откройте её по https-адресу.';
 };
@@ -201,7 +287,7 @@ $('b-start').onclick=function(){
   var unit=$('unit').value;
   var fio=clean($('fio').value);
   var dt=$('dt').value;
-  var comm=[];Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=CFG.members[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
+  var comm=[],lst=commList(unit);Array.prototype.forEach.call($('comm').querySelectorAll('input:checked'),function(cb){var m=lst[parseInt(cb.value,10)];comm.push({n:m.n,p:m.p})});
   if(!unit){$('e-start').textContent='Выберите автоколонну / подразделение (список настраивается в «Настройках»).';return}
   if(fio.split(' ').length<2){$('e-start').textContent='Введите ФИО полностью (фамилия и имя).';$('fio').focus();return}
   if(!dt){$('e-start').textContent='Укажите дату тестирования.';return}
@@ -355,8 +441,8 @@ function finish(){
 /* ---------- результаты из реестра (для администратора) ---------- */
 var AK='iteco_bdd_akey',REG={h:{},rows:[]};
 function regErr(code){var e=new Error(code);e.code=code;return e}
-function regGet(akey){
-  var url=REG_URL+'?akey='+encodeURIComponent(akey);
+function regGet(akey,q){
+  var url=REG_URL+'?akey='+encodeURIComponent(akey)+(q?'&q='+encodeURIComponent(q):'');
   return fetch(url).then(function(r){
     return r.text().then(function(t){try{return JSON.parse(t)}catch(x){throw regErr('format')}});
   }).catch(function(){
@@ -386,7 +472,11 @@ function renderList(){
     var td=el('td'),bt=el('button','btn small','Протокол');bt.onclick=function(){openRowProtocol(row)};td.appendChild(bt);tr.appendChild(td);
     tb.appendChild(tr);shown++;
   });
-  $('reg-msg').textContent='Показано: '+shown+' из '+REG.rows.length;$('reg-msg').style.color='';
+  var S2=REG.search;
+  $('reg-msg').textContent=S2
+    ?'Найдено по запросу «'+S2.q+'»: '+S2.total+(S2.total>REG.rows.length?' (показаны '+REG.rows.length+' самых новых; уточните запрос)':'')+(shown!==REG.rows.length?' · после фильтра: '+shown:'')
+    :'Показано: '+shown+' из '+REG.rows.length+' (последние записи)';
+  $('reg-msg').style.color='';
 }
 function openRowProtocol(row){
   var n=parseInt(rg(row,'Билет'),10),t=null;
@@ -415,14 +505,16 @@ $('b-reg').onclick=function(){try{$('akey').value=localStorage.getItem(AK)||''}c
 $('b-reg-back').onclick=function(){show('s-start')};
 $('b-back').onclick=function(){show('s-reg')};
 $('rflt').oninput=renderList;
-$('b-load').onclick=function(){
+function loadReg(q){
   var k=$('akey').value.trim(),m=$('reg-msg');
   if(!k){m.textContent='Введите ключ администратора.';m.style.color='#b3261e';return}
-  m.textContent='Загрузка…';m.style.color='';
-  regGet(k).then(function(d){
+  if(q&&q.length<2){m.textContent='Для поиска по всей таблице введите не менее 2 символов.';m.style.color='#b3261e';return}
+  m.textContent=q?'Поиск по всей таблице…':'Загрузка…';m.style.color='';
+  regGet(k,q).then(function(d){
     if(!d||d.error){m.textContent=d&&d.error==='denied'?'Неверный ключ администратора.':'Ошибка ответа сервера.';m.style.color='#b3261e';return}
+    if(q&&d.search!==true){m.textContent='Скрипт таблицы пока не поддерживает поиск: замените функцию doGet на новую и разверните новую версию (Развернуть → Управление развёртываниями → Новая версия).';m.style.color='#b3261e';return}
     try{localStorage.setItem(AK,k)}catch(e){}
-    try{REG.h={};(d.headers||[]).forEach(function(h,i){REG.h[h]=i});REG.rows=d.rows||[];renderList()}
+    try{REG.h={};(d.headers||[]).forEach(function(h,i){REG.h[h]=i});REG.rows=d.rows||[];REG.search=q?{q:q,total:d.total==null?(d.rows||[]).length:d.total}:null;renderList()}
     catch(e){m.textContent='Данные получены, но не отобразились: '+e.message;m.style.color='#b3261e'}
   }).catch(function(e){
     var c=e&&e.code,msg;
@@ -432,7 +524,10 @@ $('b-load').onclick=function(){
     else msg='Не удалось получить данные: '+(e&&e.message?e.message:'неизвестная ошибка');
     m.textContent=msg;m.style.color='#b3261e';
   });
-};
+}
+$('b-load').onclick=function(){loadReg('')};
+$('b-find').onclick=function(){loadReg(clean($('rflt').value))};
+$('rflt').onkeydown=function(e){if(e.key==='Enter'){e.preventDefault();loadReg(clean($('rflt').value))}};
 $('b-print').onclick=function(){window.print()};
 flushPending();
 $('b-new').onclick=function(){

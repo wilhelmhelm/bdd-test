@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Play:wght@400;700&display=swap" rel="stylesheet">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=14">
 </head>
 <body>
 <img class="bgimg" src="img/bg.jpg" alt="">
@@ -30,6 +30,8 @@
     </div>
     <label>Комиссия по проверке (отметьте присутствующих)</label>
     <div id="comm"></div>
+    <div class="acts" style="margin-top:4px"><button class="btn sec small" id="b-comm-edit">✎ Изменить состав для этой колонны</button></div>
+    <p class="hint" id="comm-src"></p>
     <div class="row">
       <div><label for="maxerr">Допустимо ошибок для зачёта</label><input type="number" id="maxerr" min="0" max="20" value="1"></div>
       <div></div>
@@ -62,8 +64,11 @@
     <textarea id="set-cols" rows="8" readonly></textarea>
     <p class="hint">Список из 36 автоколонн зашит в код страницы и здесь не редактируется.</p>
     <h3>Состав комиссии (до 5 человек)</h3>
+    <label for="set-scope">Для какой колонны задать состав</label>
+    <select id="set-scope"></select>
     <div id="set-members"></div>
-    <p class="hint">Пустые строки игнорируются. На каждой проверке можно отметить, кто из комиссии присутствует.</p>
+    <button class="btn sec small" id="b-comm-copy" style="margin-top:6px">Скопировать из общего состава</button>
+    <p class="hint" id="set-scope-hint"></p>
     <h3>Реестр проверок (Google Таблица)</h3>
     <label for="set-url">Адрес скрипта (оканчивается на /exec)</label>
     <input type="text" id="set-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
@@ -74,7 +79,7 @@
     <textarea id="set-json" rows="3" placeholder="Нажмите «Показать настройки», скопируйте текст. На другом компьютере вставьте его сюда и нажмите «Загрузить»"></textarea>
     <div class="acts" style="margin-top:8px">
       <button class="btn sec small" id="b-exp">Показать настройки</button>
-      <button class="btn sec small" id="b-cfgjs">Текст для config.js</button>
+      <button class="btn sec small" id="b-cfgjs">Текст для comissions.js</button>
       <button class="btn sec small" id="b-imp">Загрузить из текста</button>
     </div>
     <div class="err" id="e-set"></div><div class="msg" id="m-set"></div>
@@ -115,7 +120,8 @@
     </div>
     <div class="msg" id="reg-msg"></div>
     <label for="rflt" style="margin-top:12px">Поиск по ФИО / подразделению</label>
-    <input type="text" id="rflt" placeholder="начните вводить">
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="rflt" placeholder="например: Иванов" style="flex:1;min-width:180px"><button class="btn" id="b-find">Найти по всей таблице</button></div>
+    <p class="hint" style="margin:4px 0 0">Ввод сразу фильтрует показанный список. Кнопка «Найти по всей таблице» (или Enter) ищет по всем записям, не только по последним 300.</p>
     <div class="rwrap" style="margin-top:10px"><table class="rtab" id="rtab"></table></div>
   </div>
 </section>
@@ -134,7 +140,8 @@
 
 </div>
 <script src="config.js"></script>
-<script src="data.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script>/* comissions.js грузится заново примерно раз в минуту, поэтому после правки файла ничего менять в index.html не нужно */document.write('<script src="comissions.js?t='+Math.floor(Date.now()/60000)+'"><\/script>');</script>
+<script src="data.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>
