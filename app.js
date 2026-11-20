@@ -462,8 +462,8 @@ function finish(){
 /* ---------- результаты из реестра (для администратора) ---------- */
 var AK='iteco_bdd_akey',REG={h:{},rows:[]};
 function regErr(code){var e=new Error(code);e.code=code;return e}
-function regGet(akey,q){
-  var url=REG_URL+'?akey='+encodeURIComponent(akey)+(q?'&q='+encodeURIComponent(q):'');
+function regGet(akey,q,col){
+  var url=REG_URL+'?akey='+encodeURIComponent(akey)+(q?'&q='+encodeURIComponent(q):'')+(col?'&col='+encodeURIComponent(col):'');
   return fetch(url).then(function(r){
     return r.text().then(function(t){try{return JSON.parse(t)}catch(x){throw regErr('format')}});
   }).catch(function(){
@@ -480,11 +480,12 @@ function regGet(akey,q){
 }
 function rg(row,name){var i=REG.h[name];return i==null?'':String(row[i]==null?'':row[i])}
 function renderList(){
-  var f=clean($('rflt').value).toLowerCase(),tb=$('rtab');tb.innerHTML='';
+  var f=clean($('rflt').value).toLowerCase(),cf=$('rcol').value,tb=$('rtab');tb.innerHTML='';
   var hd=el('tr');['Дата','ФИО','Подразд.','Билет','Итог',''].forEach(function(h){hd.appendChild(el('th',null,h))});tb.appendChild(hd);
   var shown=0;
   REG.rows.forEach(function(row){
     var fio=rg(row,'ФИО'),unit=rg(row,'Автоколонна / подразделение');
+    if(cf&&unit.trim().toLowerCase()!==cf.toLowerCase())return; /* фильтр по автоколонне (точное совпадение) */
     if(f&&(fio+' '+unit).toLowerCase().indexOf(f)<0)return;
     var res=rg(row,'Результат'),tr=el('tr');
     tr.appendChild(el('td',null,rg(row,'Дата тестирования')||rg(row,'Отправлено').slice(0,10)));
@@ -493,11 +494,17 @@ function renderList(){
     var td=el('td'),bt=el('button','btn small','Протокол');bt.onclick=function(){openRowProtocol(row)};td.appendChild(bt);tr.appendChild(td);
     tb.appendChild(tr);shown++;
   });
-  var S2=REG.search;
-  $('reg-msg').textContent=S2
-    ?'Найдено по запросу «'+S2.q+'»: '+S2.total+(S2.total>REG.rows.length?' (показаны '+REG.rows.length+' самых новых; уточните запрос)':'')+(shown!==REG.rows.length?' · после фильтра: '+shown:'')
-    :'Показано: '+shown+' из '+REG.rows.length+' (последние записи)';
-  $('reg-msg').style.color='';
+  var M=REG.meta,cn=cf?cf.replace(/^Автотранспортное подразделение,\s*/,''):'',warn=false,msg;
+  if(M&&(M.q||M.col)&&M.colOk!==false){
+    var pp=[];if(M.q)pp.push('запрос «'+M.q+'»');if(cn)pp.push(cn);
+    msg='Найдено ('+pp.join(', ')+'): '+M.total+(M.total>REG.rows.length?' (показаны '+REG.rows.length+' самых новых; уточните запрос)':'')+(shown!==REG.rows.length?' · после фильтра: '+shown:'');
+  }else if(cf&&M&&M.colOk===false){
+    warn=true;msg='Скрипт таблицы пока не умеет фильтровать по автоколонне, поэтому показаны только записи из загруженных последних ('+shown+' из '+REG.rows.length+'). Чтобы фильтр работал по всей таблице, замените функцию doGet на новую (файл doGet_new.gs) и разверните новую версию.';
+  }else{
+    msg='Показано: '+shown+' из '+REG.rows.length+' (последние записи)'+(cn?' · '+cn:'');
+  }
+  $('reg-msg').textContent=msg;
+  $('reg-msg').style.color=warn?'#b3261e':'';
 }
 function openRowProtocol(row){
   var n=parseInt(rg(row,'Билет'),10),t=null;
@@ -526,16 +533,19 @@ $('b-reg').onclick=function(){try{$('akey').value=localStorage.getItem(AK)||''}c
 $('b-reg-back').onclick=function(){show('s-start')};
 $('b-back').onclick=function(){show('s-reg')};
 $('rflt').oninput=renderList;
+(function(){var s=$('rcol'),o=document.createElement('option');o.value='';o.textContent='Все автоколонны';s.appendChild(o);
+  COLS.forEach(function(c){var x=document.createElement('option');x.value=c;x.textContent=c.replace(/^Автотранспортное подразделение,\s*/,'');s.appendChild(x)})})();
+$('rcol').onchange=function(){loadReg(REG.meta&&REG.meta.q?REG.meta.q:'')}; /* смена колонны повторяет последний запрос (список или поиск) уже с новой колонной */
 function loadReg(q){
-  var k=$('akey').value.trim(),m=$('reg-msg');
+  var k=$('akey').value.trim(),m=$('reg-msg'),col=$('rcol').value;
   if(!k){m.textContent='Введите ключ администратора.';m.style.color='#b3261e';return}
   if(q&&q.length<2){m.textContent='Для поиска по всей таблице введите не менее 2 символов.';m.style.color='#b3261e';return}
   m.textContent=q?'Поиск по всей таблице…':'Загрузка…';m.style.color='';
-  regGet(k,q).then(function(d){
+  regGet(k,q,col).then(function(d){
     if(!d||d.error){m.textContent=d&&d.error==='denied'?'Неверный ключ администратора.':'Ошибка ответа сервера.';m.style.color='#b3261e';return}
     if(q&&d.search!==true){m.textContent='Скрипт таблицы пока не поддерживает поиск: замените функцию doGet на новую и разверните новую версию (Развернуть → Управление развёртываниями → Новая версия).';m.style.color='#b3261e';return}
     try{localStorage.setItem(AK,k)}catch(e){}
-    try{REG.h={};(d.headers||[]).forEach(function(h,i){REG.h[h]=i});REG.rows=d.rows||[];REG.search=q?{q:q,total:d.total==null?(d.rows||[]).length:d.total}:null;renderList()}
+    try{REG.h={};(d.headers||[]).forEach(function(h,i){REG.h[h]=i});REG.rows=d.rows||[];REG.meta=(q||col)?{q:q,col:col,colOk:!col||d.col===col,total:d.total==null?(d.rows||[]).length:d.total}:null;renderList()}
     catch(e){m.textContent='Данные получены, но не отобразились: '+e.message;m.style.color='#b3261e'}
   }).catch(function(e){
     var c=e&&e.code,msg;
