@@ -56,7 +56,22 @@ function el(tag,cls,txt){var e=document.createElement(tag);if(cls)e.className=cl
 function pad(n){return (n<10?'0':'')+n}
 function fmtDate(iso){var p=iso.split('-');return p[2]+'.'+p[1]+'.'+p[0]}
 function fmtTime(d){return pad(d.getHours())+':'+pad(d.getMinutes())}
-function show(id){['s-start','s-set','s-test','s-res','s-reg'].forEach(function(x){$(x).classList.toggle('hidden',x!==id)});window.scrollTo(0,0)}
+function show(id){
+  ['s-start','s-set','s-test','s-res'].forEach(function(x){
+    $(x).classList.toggle('hidden',x!==id);
+  });
+  if(id==='s-start')switchHomeTab('home');
+  window.scrollTo(0,0);
+}
+
+function switchHomeTab(tab){
+  var home=tab==='home';
+  $('home-panel').classList.toggle('hidden',!home);
+  $('reg-panel').classList.toggle('hidden',home);
+  $('tab-home').className=home?'btn':'btn sec';
+  $('b-reg').className=home?'btn sec':'btn';
+}
+$('tab-home').onclick=function(){switchHomeTab('home')};
 function clean(s){return String(s==null?'':s).replace(/\s+/g,' ').trim()}
 function b64e(t){return btoa(encodeURIComponent(t).replace(/%([0-9A-F]{2})/g,function(m,h){return String.fromCharCode(parseInt(h,16))})).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
 function b64d(x){x=x.replace(/-/g,'+').replace(/_/g,'/');while(x.length%4)x+='=';return decodeURIComponent(atob(x).split('').map(function(c){return '%'+('00'+c.charCodeAt(0).toString(16)).slice(-2)}).join(''))}
@@ -154,7 +169,7 @@ function renderComm(){
     var lab=el('label','chk');var cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.value=m.i;
     lab.appendChild(cb);lab.appendChild(el('span',null,m.n+(m.p?' — '+m.p:'')));box.appendChild(lab);
   });
-  $('comm-src').textContent=!ms.length?'':own?(COMM_LOCKED?'Состав для этой колонны задан в файле comissions.js.':'Состав сохранён для этой колонны.'):unit?'Для этой колонны свой состав не задан, подставлен общий.':'Показан общий состав.';
+  $('comm-src').textContent=!ms.length?'':own?(COMM_LOCKED?'Для изменения заданного состава комиссии обратитесь к администратору':'Состав сохранён для этой колонны.'):unit?'Для этой колонны свой состав не задан, подставлен общий.':'Показан общий состав.';
 }
 function refreshStart(){
   var sel=$('unit');sel.innerHTML='';
@@ -504,9 +519,17 @@ function openRowProtocol(row){
   $('reg-status').textContent='';$('b-new').classList.add('hidden');$('b-back').classList.remove('hidden');
   show('s-res');
 }
-$('b-reg').onclick=function(){try{$('akey').value=localStorage.getItem(AK)||''}catch(e){}show('s-reg')};
-$('b-reg-back').onclick=function(){show('s-start')};
-$('b-back').onclick=function(){show('s-reg')};
+$('b-reg').onclick=function(){
+  try{$('akey').value=localStorage.getItem(AK)||''}catch(e){}
+  switchHomeTab('reg');
+};
+$('b-reg-back').onclick=function(){
+  switchHomeTab('home');
+};
+$('b-back').onclick=function(){
+  show('s-start');
+  switchHomeTab('reg');
+};
 $('rflt').oninput=renderList;
 function loadReg(q){
   var k=$('akey').value.trim(),m=$('reg-msg');
