@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -17,78 +18,189 @@
 
 <!-- СТАРТ -->
 <section id="s-start" class="noprint">
+
+  <!-- ВКЛАДКИ -->
   <div class="acts" style="margin-bottom:16px">
-  <button class="btn" id="tab-home">Главная</button>
-  <button class="btn sec" id="b-reg">Результаты проверок</button>
-</div>
-<div id="home-panel">
-  <h1>Проверка знаний по БДД</h1>
-  <p class="sub">Экзаменационные билеты 2026 · ITECO</p>
-  <div class="card">
-    <div class="adm"><label for="unit">Автоколонна / подразделение</label>
-    <select id="unit"></select></div>
-    <label for="fio">ФИО тестируемого</label>
-    <input type="text" id="fio" placeholder="Иванов Иван Иванович" autocomplete="off">
-    <div class="adm"><div class="row">
-      <div><label for="dt">Дата тестирования</label><input type="date" id="dt"></div>
-      <div><label for="tk">Билет</label><select id="tk"><option value="0">Случайный</option></select></div>
+    <button class="btn" id="tab-home">Главная</button>
+    <button class="btn sec" id="b-reg">Результаты проверок</button>
+  </div>
+
+  <!-- ГЛАВНАЯ -->
+  <div id="home-panel">
+    <h1>Проверка знаний по БДД</h1>
+    <p class="sub">Экзаменационные билеты 2026 · ITECO</p>
+
+    <div class="card">
+      <div class="adm">
+        <label for="unit">Автоколонна / подразделение</label>
+        <select id="unit"></select>
+      </div>
+
+      <label for="fio">ФИО тестируемого</label>
+      <input type="text" id="fio" placeholder="Иванов Иван Иванович" autocomplete="off">
+
+      <div class="adm">
+        <div class="row">
+          <div>
+            <label for="dt">Дата тестирования</label>
+            <input type="date" id="dt">
+          </div>
+          <div>
+            <label for="tk">Билет</label>
+            <select id="tk">
+              <option value="0">Случайный</option>
+            </select>
+          </div>
+        </div>
+
+        <label>Комиссия по проверке (отметьте присутствующих)</label>
+        <div id="comm"></div>
+
+        <div class="acts" style="margin-top:4px">
+          <button class="btn sec small" id="b-comm-edit">✎ Изменить состав для этой колонны</button>
+        </div>
+
+        <p class="hint" id="comm-src"></p>
+
+        <div class="row">
+          <div>
+            <label for="maxerr">Допустимо ошибок для зачёта</label>
+            <input type="number" id="maxerr" min="0" max="20" value="1">
+          </div>
+          <div></div>
+        </div>
+      </div>
+
+      <p class="hint">
+        В билете <span id="qcnt">20</span> вопросов, в каждом один правильный ответ.
+        Вернуться к вопросам и изменить ответ можно до нажатия «Завершить».
+      </p>
+
+      <div class="err" id="e-start"></div>
+
+      <div class="cta">
+        <button class="btn" id="b-start">Начать тест</button>
+        <button class="btn sec small adm" id="b-settings">
+          ⚙ Настройки: колонны, комиссия, реестр
+        </button>
+      </div>
+
+      <div class="adm" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+        <button class="btn sec small" id="b-link">
+          🔗 Создать ссылку для удалённой проверки
+        </button>
+
+        <div id="lnk-box" class="hidden">
+          <div class="lnkrow">
+            <input type="text" id="lnk" readonly>
+            <button class="btn small" id="b-copy">Копировать</button>
+          </div>
+          <p class="hint" id="lnk-hint">
+            Ссылка содержит подразделение, комиссию, билет и число допустимых ошибок.
+            Отправьте её водителю: он вводит только ФИО.
+          </p>
+        </div>
+      </div>
+
+      <p class="hint adm" id="reg-info"></p>
     </div>
-    <label>Комиссия по проверке (отметьте присутствующих)</label>
-    <div id="comm"></div>
-    <div class="acts" style="margin-top:4px"><button class="btn sec small" id="b-comm-edit">✎ Изменить состав для этой колонны</button></div>
-    <p class="hint" id="comm-src"></p>
-    <div class="row">
-      <div><label for="maxerr">Допустимо ошибок для зачёта</label><input type="number" id="maxerr" min="0" max="20" value="1"></div>
-      <div></div>
-    </div>
-    </div>
-    <p class="hint">В билете <span id="qcnt">20</span> вопросов, в каждом один правильный ответ. Вернуться к вопросам и изменить ответ можно до нажатия «Завершить».</p>
-    <div class="err" id="e-start"></div>
-    <div class="cta">
-      <button class="btn" id="b-start">Начать тест</button>
-      <button class="btn sec small adm" id="b-settings">⚙ Настройки: колонны, комиссия, реестр</button>
-    </div>
-    <div class="adm" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
-      <button class="btn sec small" id="b-link">🔗 Создать ссылку для удалённой проверки</button>
-      <div id="lnk-box" class="hidden">
-        <div class="lnkrow"><input type="text" id="lnk" readonly><button class="btn small" id="b-copy">Копировать</button></div>
-        <p class="hint" id="lnk-hint">Ссылка содержит подразделение, комиссию, билет и число допустимых ошибок. Отправьте её водителю: он вводит только ФИО.</p>
+  </div>
+
+  <!-- РЕЗУЛЬТАТЫ ПРОВЕРОК -->
+  <div id="reg-panel" class="hidden noprint">
+    <h1>Результаты проверок</h1>
+    <p class="sub">
+      Данные из Google-таблицы · выберите строку, чтобы открыть протокол и распечатать
+    </p>
+
+    <div class="card">
+      <label for="akey">Ключ администратора</label>
+      <input type="password" id="akey" autocomplete="off"
+             placeholder="задаётся в скрипте таблицы (ADMIN_KEY)">
+
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn" id="b-load">Загрузить результаты</button>
+        <button class="btn sec" id="b-reg-back">← На главную</button>
+      </div>
+
+      <div class="msg" id="reg-msg"></div>
+
+      <label for="rflt" style="margin-top:12px">
+        Поиск по ФИО / подразделению
+      </label>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" id="rflt" placeholder="например: Иванов"
+               style="flex:1;min-width:180px">
+        <button class="btn" id="b-find">Найти по всей таблице</button>
+      </div>
+
+      <p class="hint" style="margin:4px 0 0">
+        Ввод сразу фильтрует показанный список. Кнопка «Найти по всей таблице»
+        (или Enter) ищет по всем записям, не только по последним 300.
+      </p>
+
+      <div class="rwrap" style="margin-top:10px">
+        <table class="rtab" id="rtab"></table>
       </div>
     </div>
-    <div class="adm" style="margin-top:10px"><button class="btn sec small" id="b-reg">📋 Результаты проверок и протоколы</button></div>
-    <p class="hint adm" id="reg-info"></p>
   </div>
-    </div>
+
 </section>
 
 <!-- НАСТРОЙКИ -->
 <section id="s-set" class="hidden noprint">
   <h1>Настройки</h1>
-  <p class="sub">Сохраняются в этом браузере и подставляются при следующих проверках</p>
+  <p class="sub">
+    Сохраняются в этом браузере и подставляются при следующих проверках
+  </p>
+
   <div class="card">
     <h3>Автоколонны / подразделения</h3>
     <textarea id="set-cols" rows="8" readonly></textarea>
-    <p class="hint">Список из 36 автоколонн зашит в код страницы и здесь не редактируется.</p>
+    <p class="hint">
+      Список из 36 автоколонн зашит в код страницы и здесь не редактируется.
+    </p>
+
     <h3>Состав комиссии (до 5 человек)</h3>
     <label for="set-scope">Для какой колонны задать состав</label>
     <select id="set-scope"></select>
     <div id="set-members"></div>
-    <button class="btn sec small" id="b-comm-copy" style="margin-top:6px">Скопировать из общего состава</button>
+
+    <button class="btn sec small" id="b-comm-copy" style="margin-top:6px">
+      Скопировать из общего состава
+    </button>
     <p class="hint" id="set-scope-hint"></p>
+
     <h3>Реестр проверок (Google Таблица)</h3>
     <label for="set-url">Адрес скрипта (оканчивается на /exec)</label>
-    <input type="text" id="set-url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+    <input type="text" id="set-url"
+           placeholder="https://script.google.com/macros/s/.../exec"
+           autocomplete="off">
+
     <label for="set-key">Ключ</label>
-    <input type="text" id="set-key" placeholder="тот же ключ, что в скрипте" autocomplete="off">
-    <p class="hint">Адрес и ключ задаются в самом файле страницы (переменные REG_URL и REG_KEY) и здесь только показываются.</p>
+    <input type="text" id="set-key"
+           placeholder="тот же ключ, что в скрипте"
+           autocomplete="off">
+
+    <p class="hint">
+      Адрес и ключ задаются в самом файле страницы (переменные REG_URL и REG_KEY)
+      и здесь только показываются.
+    </p>
+
     <h3>Перенос настроек на другой компьютер</h3>
-    <textarea id="set-json" rows="3" placeholder="Нажмите «Показать настройки», скопируйте текст. На другом компьютере вставьте его сюда и нажмите «Загрузить»"></textarea>
+    <textarea id="set-json" rows="3"
+      placeholder="Нажмите «Показать настройки», скопируйте текст. На другом компьютере вставьте его сюда и нажмите «Загрузить»"></textarea>
+
     <div class="acts" style="margin-top:8px">
       <button class="btn sec small" id="b-exp">Показать настройки</button>
       <button class="btn sec small" id="b-cfgjs">Текст для comissions.js</button>
       <button class="btn sec small" id="b-imp">Загрузить из текста</button>
     </div>
-    <div class="err" id="e-set"></div><div class="msg" id="m-set"></div>
+
+    <div class="err" id="e-set"></div>
+    <div class="msg" id="m-set"></div>
+
     <div class="cta">
       <button class="btn" id="b-save">Сохранить</button>
       <button class="btn sec" id="b-cancel">Назад</button>
@@ -99,36 +211,28 @@
 <!-- ТЕСТ -->
 <section id="s-test" class="hidden noprint">
   <div class="card">
-    <div class="top"><span id="t-who"></span><span id="t-tk"></span></div>
+    <div class="top">
+      <span id="t-who"></span>
+      <span id="t-tk"></span>
+    </div>
+
     <div class="bar"><i id="bar"></i></div>
-    <div class="top"><span id="t-num"></span><span id="t-cnt"></span></div>
+
+    <div class="top">
+      <span id="t-num"></span>
+      <span id="t-cnt"></span>
+    </div>
+
     <div class="qtext" id="q-text"></div>
     <div id="q-imgs"></div>
     <div id="q-opts"></div>
+
     <div class="nav">
       <button class="btn sec" id="b-prev">← Назад</button>
       <button class="btn" id="b-next">Далее →</button>
     </div>
-    <div class="dots" id="dots"></div>
-  </div>
-</section>
 
-<!-- СПИСОК РЕЗУЛЬТАТОВ -->
-<<div id="reg-panel" class="hidden noprint">>
-  <h1>Результаты проверок</h1>
-  <p class="sub">Данные из Google-таблицы · выберите строку, чтобы открыть протокол и распечатать</p>
-  <div class="card">
-    <label for="akey">Ключ администратора</label>
-    <input type="password" id="akey" autocomplete="off" placeholder="задаётся в скрипте таблицы (ADMIN_KEY)">
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-      <button class="btn" id="b-load">Загрузить результаты</button>
-      <button class="btn sec" id="b-reg-back">← На главную</button>
-    </div>
-    <div class="msg" id="reg-msg"></div>
-    <label for="rflt" style="margin-top:12px">Поиск по ФИО / подразделению</label>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><input type="text" id="rflt" placeholder="например: Иванов" style="flex:1;min-width:180px"><button class="btn" id="b-find">Найти по всей таблице</button></div>
-    <p class="hint" style="margin:4px 0 0">Ввод сразу фильтрует показанный список. Кнопка «Найти по всей таблице» (или Enter) ищет по всем записям, не только по последним 300.</p>
-    <div class="rwrap" style="margin-top:10px"><table class="rtab" id="rtab"></table></div>
+    <div class="dots" id="dots"></div>
   </div>
 </section>
 
@@ -138,15 +242,25 @@
     <button class="btn" id="b-print">🖨 Распечатать протокол</button>
     <button class="btn sec" id="b-new">Новый тест</button>
     <button class="btn sec hidden" id="b-back">← К списку результатов</button>
-    <div class="hint" style="flex-basis:100%;margin:0">Протокол занимает 2 страницы. Чтобы потратить один лист, в окне печати выберите «Двусторонняя печать» (переплёт по длинному краю).</div>
+
+    <div class="hint" style="flex-basis:100%;margin:0">
+      Протокол занимает 2 страницы. Чтобы потратить один лист, в окне печати
+      выберите «Двусторонняя печать» (переплёт по длинному краю).
+    </div>
   </div>
+
   <div class="msg noprint" id="reg-status" style="margin:0 0 10px"></div>
   <div class="proto" id="proto"></div>
 </section>
 
 </div>
+
 <script src="config.js"></script>
-<script>/* comissions.js грузится заново примерно раз в минуту, поэтому после правки файла ничего менять в index.html не нужно */document.write('<script src="comissions.js?t='+Math.floor(Date.now()/60000)+'"><\/script>');</script>
+<script>
+/* comissions.js грузится заново примерно раз в минуту,
+   поэтому после правки файла ничего менять в index.html не нужно */
+document.write('<script src="comissions.js?t='+Math.floor(Date.now()/60000)+'"><\/script>');
+</script>
 <script src="data.js?v=14"></script>
 <script src="app.js?v=15"></script>
 </body>
